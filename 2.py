@@ -122,4 +122,65 @@ if __name__ == '__main__':
 
     # 시나리오 랜덤으로 돌리기
     choice_num = random.choice([1, 2, 3, 4, 5, 6])
-    print(f"선택된 시나리오 번호:")
+    print(f"선택된 시나리오 번호: {choice_num}")
+
+    # 1. 로그인
+    login_response = login()
+    if not login_response:
+        print("로그인 실패: 프로세스를 중단합니다.")
+        exit()
+
+    member_id = login_response['Id']
+    print(f"로그인한 사용자 ID: {member_id}")
+
+    # 2. 가입된 모임 목록 확인
+    if choice_num in [1, 2]:
+        print("\n=== 가입된 모임 목록 확인 ===")
+        groups = get_my_groups(member_id)
+        if not groups:
+            print("가입된 모임이 없습니다. 시나리오를 종료합니다.")
+            exit()
+
+        # 랜덤으로 하나의 모임 선택
+        selected_group = random.choice(groups)
+        group_id = selected_group['id']
+        print(f"선택된 모임 ID: {group_id}, 모임 이름: {selected_group['groupName']}")
+
+        # 3. 게시판 확인
+        print("\n=== 게시판 확인 ===")
+        posts = get_group_board(group_id)
+        if posts:
+            # 게시판 랜덤 글에 댓글 작성
+            first_post = random.choice(posts)
+            board_id = first_post['id']
+            print(f"게시판 글 ID: {board_id}, 제목: {first_post['title']}")
+
+            # 4. 게시판 댓글 작성
+            print("\n=== 게시판 댓글 작성 ===")
+            post_comment(board_id, member_id)
+        else:
+            print("게시판에 글이 없습니다. 시나리오 종료.")
+
+    # 3. 여행 계획 결정
+    elif choice_num in [3, 4]:
+        print("\n=== 여행 계획 결정===")
+        groups = get_my_groups(member_id)
+        if groups:
+            selected_group = random.choice(groups)
+            group_id = selected_group['id']
+            travle_plan(group_id, member_id)
+        else:
+            print("가입된 모임이 없습니다.")
+
+    # 4. 리뷰 작성
+    elif choice_num in [5, 6]:
+        print("\n=== 리뷰 작성===")
+        groups = get_my_groups(member_id)
+        if groups:
+            selected_group = random.choice(groups)
+            group_id = selected_group['id']
+            post_review(group_id, member_id)
+        else:
+            print("가입된 모임이 없습니다.")
+
+    print("\n=== 시나리오 종료===")
