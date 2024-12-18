@@ -13,7 +13,9 @@ def generate():
     gender = random.choice(['MALE', 'FEMALE'])
     address = fake.address()
 
-    data = {'name': name,
+    data = {
+            'member_id' : email,
+            'name': name,
             'email': email,
             'password': password,
             'phone': phone,
@@ -44,4 +46,5 @@ def generate_group(memberId):
         "categories": categories  # 카테고리 리스트
     }
 
+    print(f"생성된 group_data: {group_data}")
     return group_data
