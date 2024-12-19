@@ -111,7 +111,7 @@ def get_random_group():
 
 # 3. 게시판 확인
 def get_group_board(group_id):
-    response = session.get(api + '/group/board', params={'groupId': group_id})
+    response = session.get(api + '/posts', params={'groupId': group_id})
     if response.status_code == 200:
         posts = response.json()
         print(f"모임 게시판 최신 글: {posts}")
@@ -129,7 +129,7 @@ def create_travle_post(group_id, member_id, title="여행 계획"):
         "contentType": "text",
         "content": ""
     }
-    response = session.post(api + '/group/board', json=post_data)
+    response = session.post(api + '/group/post', json=post_data)
     if response.status_code == 201:
         print(f"여행 계획 글 작성 완료: {response.json()}")
         return response.json()
@@ -148,7 +148,7 @@ def post_comment(board_id, member_id):
 
 # 5. 여행 계획 결정 (게시판에 글 작성)
 def travle_plan(group_id, member_id):
-    response = session.post(api + '/group/board', json={'groupId': group_id, 'memberId': member_id})
+    response = session.post(api + '/group/notice', json={'groupId': group_id, 'memberId': member_id})
     if response.status_code == 201:
         print(f"여행 계획 게시 완료: {response.json()}")
     else:
@@ -157,7 +157,7 @@ def travle_plan(group_id, member_id):
 
 # 6. 리뷰 작성
 def post_review(group_id, member_id):
-    response = session.post(api + '/group/board', json={'groupId': group_id, 'memberId': member_id})
+    response = session.post(api + '/postComment', json={'groupId': group_id, 'memberId': member_id})
     if response.status_code == 201:
         print(f"여행 리뷰 작성 완료: {response.json()}")
     else:
