@@ -40,16 +40,13 @@ def login(email=None, password=None):
 
             # 사용자 이메일과 비밀번호 추출
             email, password = user['email'], user['password']
-            # memberId = user['id']
 
         # API를 통해 로그인 요청
         response = session.put(api + '/member/login', json={'email': email, 'password': password})
 
         if response.status_code == 200:
             print(f"로그인 성공: {email}, memberId: {response.json()['id']}")
-            # return memberId
             return response.json()
-
         else:
             print(f"로그인 실패: {email}")
             return False
@@ -112,6 +109,57 @@ def get_random_group():
             connection.close()
 
 
+# 2-2. 모임 멤버 여부 확인 및 초대/수락
+def ensure_member_in_group(member_id, group_id):
+    # 멤버 여부 확인
+    response = session.get(api + '/group/members', params={'groupId': group_id})
+    if response.status_code == 200:
+        members = response.json()
+        if any(member['id'] == member_id for member in members):
+            print("사용자는 이미 모임의 멤버입니다.")
+            return True
+    else:
+        print(f"멤버 확인 실패: {response.status_code}, {response.text}")
+
+    # 관리자 정보 가져오기
+    admin_response = session.get(api + f'/group/{group_id}')
+    if admin_response.status_code != 200:
+        print(f"관리자 정보 조회 실패: {admin_response.status_code}, {admin_response.text}")
+        return False
+
+    group_data = admin_response.json()
+    admin_id = group_data.get('groupOwnerId')
+    if not admin_id:
+        print("모임 관리자 정보를 찾을 수 없습니다.")
+        return False
+
+    print(f"모임 관리자 ID: {admin_id}")
+
+    # 2-3. 멤버 초대 요청
+    invite_response = session.post(api + '/group/invite', json={
+        'memberId': member_id,
+        'groupId': group_id,
+        'groupAdminId': admin_id
+    })
+    if invite_response.status_code == 201:
+        print("멤버 초대 성공")
+    else:
+        print(f"멤버 초대 실패: {invite_response.status_code}, {invite_response.text}")
+        return False
+
+    # 2-4. 초대 수락 요청
+    accept_invite_response = session.post(api + '/group/accept-invite', json={
+        'groupId': group_id,
+        'memberId': member_id
+    })
+    if accept_invite_response.status_code == 200:
+        print("초대 수락 성공")
+        return True
+    else:
+        print(f"초대 수락 실패: {accept_invite_response.status_code}, {accept_invite_response.text}")
+        return False
+
+
 # 3. 게시판 확인
 def get_group_board(group_id):
     response = session.get(api + '/posts', params={'groupId': group_id})
@@ -145,7 +193,6 @@ def create_travle_post(group_id, member_id):
         "contentType": "text",
         "content": content
     }
-    print(f"전송 데이터: {post_data}") # 디버깅용
     response = session.post(api + '/group/post', json=post_data)
     if response.status_code == 201:
         print(f"여행 계획 글 작성 완료: {response.json()}")
@@ -157,7 +204,7 @@ def create_travle_post(group_id, member_id):
 # 4. 게시판 댓글 작성
 def post_comment(board_id, member_id):
     _, content = generate_random_text()
-    comment_data = {board_id: board_id, 'memberId': member_id, 'content': content}
+    comment_data = {'boardId': board_id, 'memberId': member_id, 'content': content}
     response = session.post(api + '/group/postComment', json=comment_data)
     if response.status_code == 201:
         print(f"댓글 작성 완료: {response.json()}")
@@ -209,7 +256,7 @@ if __name__ == '__main__':
         print("로그인 실패: 프로세스를 중단합니다.")
         exit()
 
-    member_id = login_response.get('email')
+    member_id = login_response.get('id')
     if not member_id:
         print("로그인 응답에 'id'가 없습니다. 응답:", login_response)
         exit()
@@ -217,9 +264,9 @@ if __name__ == '__main__':
     print(f"로그인한 사용자 ID: {member_id}")
 
     # 2. 가입된 모임 목록 확인 또는 랜덤 모임 가져오기
-
     print("\n=== 가입된 모임 목록 확인 ===")
-    groups = get_my_groups(member_id)
+    groups_response = get_my_groups(member_id)
+    groups = groups_response.get('content', []) if isinstance(groups_response, dict) else []
 
     if not groups:
         print("가입된 모임이 없습니다. DB에서 랜덤으로 모임을 가져옵니다.")
@@ -227,7 +274,6 @@ if __name__ == '__main__':
         if not selected_group:
             print("랜덤으로 선택된 모임이 없습니다. 시나리오를 종료합니다.")
             exit()
-
     else:
         # 가입된 모임에서 랜덤으로 하나 선택
         selected_group = random.choice(groups)
@@ -237,8 +283,13 @@ if __name__ == '__main__':
         print("모임 ID를 가져올 수 없습니다. 선택된 모임 데이터", selected_group)
         exit()
 
-    print(f"선택된 모임 ID: {group_id}, 모임 이름: {selected_group['group_id']}")
+    print(f"선택된 모임 ID: {group_id}, 모임 이름: {selected_group.get('group_name')}")
 
+    # 2-2. 초대 처리 및 게시판 접근
+    print("\n=== 멤버 초대 처리 ===")
+    if not ensure_member_in_group(member_id, group_id):
+        print("멤버 초대 및 처리 실패. 시나리오를 종료합니다.")
+        exit()
 
     # 3. 게시판 확인
     print("\n=== 게시판 확인 ===")
@@ -250,38 +301,21 @@ if __name__ == '__main__':
         # 3-1. 게시판에 여행 계획 글 작성
         print("\n=== 게시판에 여행 계획 글 작성 ===")
         created_post = create_travle_post(group_id, member_id)
-
-        if created_post:
-            # 새로 작성된 글을 posts 리스트에 추가
-            posts = [created_post]
-
-        else:
-            print("여행 계획 글 작성 실패로 게시판 작업을 중단합니다.")
-
-    # 게시판 글이 없을 경우 처리
-    if not posts:
-        print("여행 계획 글 작성 후에도 게시판에 글이 없습니다. 시나리오를 종료합니다.")
-        exit()
-
-    # 게시판에서 첫 번째 글 사용
-    first_post = posts[0]
-    if isinstance(first_post, dict) and 'id' in first_post:
-        board_id = first_post['id']
-        print(f"게시판 글 ID: {board_id}, 제목: {first_post.get('title', '제목 없음')}")
-
-        # 4. 게시판 댓글 작성
-        print("\n=== 게시판 댓글 작성 ===")
-        post_comment(board_id, member_id)
+        if not created_post:
+            print("게시판 글 작성 실패. 시나리오를 종료합니다.")
+            exit()
     else:
-        print("게시판 글 데이터 형식이 올바르지 않습니다. 작업을 중간합니다.")
-        exit()
+        # 게시판에서 첫 번째 글 사용
+        created_post = posts[0]
+
+    print(f"게시판 글 ID: {created_post['id']}, 제목: {created_post['title']}")
 
     # 5. 여행 계획 결정
-    print("\n=== 여행 계획 결정===")
+    print("\n=== 여행 계획 결정 ===")
     travle_plan(group_id, member_id)
 
     # 6. 리뷰 작성
-    print("\n=== 리뷰 작성===")
+    print("\n=== 리뷰 작성 ===")
     post_review(group_id, member_id)
 
     print("\n=== 시나리오 종료===")
